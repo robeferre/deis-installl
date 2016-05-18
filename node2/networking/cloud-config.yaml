@@ -1,0 +1,51 @@
+#cloud-config
+hostname: SRVDEIS02D
+manage_etc_hosts: localhost
+coreos:
+   units:
+    - name: static.network
+      content: |
+        [Match]
+        Name=en*
+        [Network]
+        Address= 192.168.57.66/24
+        Gateway= 192.168.57.1
+        DNS= 192.168.57.156
+    - name: format-ephemeral.service
+      command: start
+      content: |
+        [Unit]
+        Description=Formats the ephemeral drive
+        After=dev-sdb.device
+        Requires=dev-sdb.device
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/sbin/wipefs -f /dev/sdb
+        ExecStart=/usr/sbin/mkfs.ext4 -F /dev/sdb
+    - name: var-lib-docker.mount
+      command: start
+      content: |
+        [Unit]
+        Description=Mount ephemeral to /var/lib/docker
+        Requires=format-ephemeral.service
+        After=format-ephemeral.service
+        [Mount]
+        What=/dev/sdb
+        Where=/var/lib/docker
+        Type=ext4
+    - name: docker.service
+      drop-ins:
+        - name: 10-wait-docker.conf
+          content: |
+            [Unit]
+            After=var-lib-docker.mount
+            Requires=var-lib-docker.mount
+users:
+  - name: core
+    passwd: $1$Iy625W7F$XQIIth.vH/TZgy3g/t95x0
+    groups:
+      - sudo
+      - docker
+  - name: root
+    passwd: $1$Iy625W7F$XQIIth.vH/TZgy3g/t95x0
